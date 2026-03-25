@@ -1,4 +1,6 @@
 # velaflame
+
+Copyright (C) 2026 Brian Alvarez. Licensed under the [GNU General Public License v3.0](LICENSE).
 ESPHome firmware for the beautiful Velaflame candles:
 https://www.velaflame.com/
 
