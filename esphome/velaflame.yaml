@@ -156,10 +156,8 @@ light:
             static float fast_b      = 1.0f;
             static float slow_target = 1.0f;
             static int   slow_timer  = 0;
-            // ── Static state: per-LED directional lean ──
-            static float lean_d2 = 1.0f, lean_d3 = 1.0f, lean_d4 = 1.0f;
-            static float lean_tgt_d2 = 1.0f, lean_tgt_d3 = 1.0f, lean_tgt_d4 = 1.0f;
-            static int   lean_timer  = 0;
+            // ── Static state: lean angle (which LED faces the flame) ──
+            static float lean_angle  = 0.0f;
 
             float wind = id(candle_intensity).state;
 
@@ -184,18 +182,23 @@ light:
             if (bri_mult < 0.05f) bri_mult = 0.05f;
             if (bri_mult > 1.0f)  bri_mult = 1.0f;
 
-            // ── Per-LED lean: retarget every ~2s (40 ticks) ──
-            lean_timer++;
-            if (lean_timer >= 40) {
-              lean_timer = 0;
-              float lr = wind * 0.25f;
-              lean_tgt_d2 = 1.0f + ((float)(rand() % 1000) / 500.0f - 1.0f) * lr;
-              lean_tgt_d3 = 1.0f + ((float)(rand() % 1000) / 500.0f - 1.0f) * lr;
-              lean_tgt_d4 = 1.0f + ((float)(rand() % 1000) / 500.0f - 1.0f) * lr;
-            }
-            lean_d2 = lean_d2 * 0.96f + lean_tgt_d2 * 0.04f;
-            lean_d3 = lean_d3 * 0.96f + lean_tgt_d3 * 0.04f;
-            lean_d4 = lean_d4 * 0.96f + lean_tgt_d4 * 0.04f;
+            // ── Flame lean: random-walk angle around the wick triangle ──
+            // D2/D3/D4 are 120° apart; projecting onto them guarantees one is always
+            // brighter and one always dimmer — no more three-way ties
+            lean_angle += ((float)(rand() % 1000) / 500.0f - 1.0f) * wind * 5.0f;
+            if (lean_angle >= 360.0f) lean_angle -= 360.0f;
+            if (lean_angle <    0.0f) lean_angle += 360.0f;
+
+            const float D2R = 0.017453293f;
+            float raw2 = cosf(lean_angle * D2R) * 0.5f + 0.5f;
+            float raw3 = cosf((lean_angle + 120.0f) * D2R) * 0.5f + 0.5f;
+            float raw4 = cosf((lean_angle + 240.0f) * D2R) * 0.5f + 0.5f;
+            float rmax = raw2; if (raw3 > rmax) rmax = raw3; if (raw4 > rmax) rmax = raw4;
+            if (rmax < 0.001f) rmax = 0.001f;
+            float lean_amp = wind * 0.45f;  // hot LED at 1.0, coldest at 1.0 - lean_amp
+            float lean_d2 = 1.0f - lean_amp * (1.0f - raw2 / rmax);
+            float lean_d3 = 1.0f - lean_amp * (1.0f - raw3 / rmax);
+            float lean_d4 = 1.0f - lean_amp * (1.0f - raw4 / rmax);
 
             // ── Read user base color (remote_values stable because publish=false) ──
             float rem_bri = id(light_main).remote_values.get_brightness();
@@ -220,21 +223,24 @@ light:
               if (hue < 0.0f) hue += 1.0f;
             }
 
-            // ── Wavelength-based hue shift ──
+            // ── Wavelength-based hue + saturation shift ──
             // Dim → lower hue (longer wavelength): yellow→orange, blue→teal, purple→blue
-            // Bright-side lean → slightly shorter wavelength (hotter); dim-side → longer
-            float global_hue_shift = -(1.0f - bri_mult) * wind * 0.04f;
+            // Dim → higher saturation: colors deepen as the flame cools
+            float global_hue_shift = -(1.0f - bri_mult) * wind * 0.10f;
+            float global_sat_boost = (1.0f - bri_mult) * wind * 0.20f;
 
-            // ── Per-LED output: apply lean + hue shift, convert to RGB, apply gamma, set outputs ──
-            // gamma = 2.0 → output = val * val
-            // Directly drives all 12 channels, bypassing the all_r/g/b/w fan-out
+            // ── Per-LED output: apply lean + hue/sat shift, convert to RGB, gamma, set outputs ──
+            // Hot LED (lean=1.0): no extra shift. Cool LED (lean<1.0): extra redward + more saturated.
+            // gamma = 2.0 → output = val * val; directly drives all 12 channels.
             {
               float lean = lean_d2;
-              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.02f;
+              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.05f;
               if (led_hue < 0.0f) led_hue = 0.0f;
               if (led_hue > 1.0f) led_hue = 1.0f;
+              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.10f;
+              if (sat_led > 1.0f) sat_led = 1.0f;
               float h6 = led_hue * 6.0f; int hi = (int)h6; float f = h6 - (float)hi;
-              float p = val_h*(1.0f-sat), q = val_h*(1.0f-sat*f), t = val_h*(1.0f-sat*(1.0f-f));
+              float p = val_h*(1.0f-sat_led), q = val_h*(1.0f-sat_led*f), t = val_h*(1.0f-sat_led*(1.0f-f));
               float cr, cg, cb;
               switch (hi % 6) {
                 case 0: cr=val_h; cg=t;     cb=p;     break;
@@ -254,11 +260,13 @@ light:
             }
             {
               float lean = lean_d3;
-              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.02f;
+              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.05f;
               if (led_hue < 0.0f) led_hue = 0.0f;
               if (led_hue > 1.0f) led_hue = 1.0f;
+              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.10f;
+              if (sat_led > 1.0f) sat_led = 1.0f;
               float h6 = led_hue * 6.0f; int hi = (int)h6; float f = h6 - (float)hi;
-              float p = val_h*(1.0f-sat), q = val_h*(1.0f-sat*f), t = val_h*(1.0f-sat*(1.0f-f));
+              float p = val_h*(1.0f-sat_led), q = val_h*(1.0f-sat_led*f), t = val_h*(1.0f-sat_led*(1.0f-f));
               float cr, cg, cb;
               switch (hi % 6) {
                 case 0: cr=val_h; cg=t;     cb=p;     break;
@@ -278,11 +286,13 @@ light:
             }
             {
               float lean = lean_d4;
-              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.02f;
+              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.05f;
               if (led_hue < 0.0f) led_hue = 0.0f;
               if (led_hue > 1.0f) led_hue = 1.0f;
+              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.10f;
+              if (sat_led > 1.0f) sat_led = 1.0f;
               float h6 = led_hue * 6.0f; int hi = (int)h6; float f = h6 - (float)hi;
-              float p = val_h*(1.0f-sat), q = val_h*(1.0f-sat*f), t = val_h*(1.0f-sat*(1.0f-f));
+              float p = val_h*(1.0f-sat_led), q = val_h*(1.0f-sat_led*f), t = val_h*(1.0f-sat_led*(1.0f-f));
               float cr, cg, cb;
               switch (hi % 6) {
                 case 0: cr=val_h; cg=t;     cb=p;     break;
