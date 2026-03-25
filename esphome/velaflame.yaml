@@ -12,12 +12,6 @@ external_components:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  on_boot:
-    priority: 900
-    then:
-      - output.turn_on: tlc59116_enable_pin
-      - delay: 5ms
-      - logger.log: "${friendly_name} booted — TLC59116 enable pin set"
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -32,12 +26,9 @@ i2c:
 
 tlc59116:
   address: 0x60
+  enable_pin: GPIO10
 
 output:
-  # TLC59116 enable pin - driven HIGH on boot before TLC59116 init
-  - platform: gpio
-    pin: GPIO10
-    id: tlc59116_enable_pin
   # DRV8210P H-bridge for wick electromagnet
   # https://www.ti.com/lit/ds/symlink/drv8210p.pdf
   - platform: gpio

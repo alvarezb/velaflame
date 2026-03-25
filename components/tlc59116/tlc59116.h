@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#include "esphome/core/hal.h"
 #include "esphome/components/output/float_output.h"
 #include "esphome/components/i2c/i2c.h"
 
@@ -17,10 +18,19 @@ static const uint8_t REG_LEDOUT0 = 0x14;   // LEDOUT0-LEDOUT3: 0x14-0x17
 
 class TLC59116Output : public Component, public i2c::I2CDevice {
  public:
+  void set_enable_pin(GPIOPin *pin) { this->enable_pin_ = pin; }
+
   void setup() override {
-    // MODE1: normal mode (OSC on), auto-increment enabled
-    // Bit 5 (AI2) = 1 for auto-increment all registers
-    uint8_t mode1 = 0x00;  // Normal operation, oscillator on
+    // Drive enable pin HIGH and wait for the chip to be ready
+    if (this->enable_pin_ != nullptr) {
+      this->enable_pin_->setup();
+      this->enable_pin_->digital_write(true);
+      delay(5);
+      ESP_LOGI("tlc59116", "Enable pin asserted");
+    }
+
+    // MODE1: normal mode (OSC on)
+    uint8_t mode1 = 0x00;
 
     // Retry a few times — the enable pin may have just been asserted
     bool ok = false;
@@ -68,6 +78,9 @@ class TLC59116Output : public Component, public i2c::I2CDevice {
   }
 
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
+
+ protected:
+  GPIOPin *enable_pin_{nullptr};
 };
 
 class TLC59116Channel : public output::FloatOutput, public Component {
