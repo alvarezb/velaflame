@@ -1,5 +1,5 @@
 # velaflame
-ESPHome firmware for the mechanically beautiful Velaflame candles:
+ESPHome firmware for the beautiful Velaflame candles:
 https://www.velaflame.com/
 
 To flash the new firmware, follow these [Instructions](FLASH_FIRMWARE.md)
