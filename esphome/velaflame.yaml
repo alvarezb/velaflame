@@ -13,6 +13,31 @@ external_components:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100  # runs after state restore
+    then:
+      - if:
+          condition:
+            lambda: "return !id(color_initialized);"
+          then:
+            # First boot: no cached color — set warm amber and mark initialized
+            - light.turn_on:
+                id: light_main
+                red: 100%
+                green: 63.5%
+                blue: 0%
+                white: 0%
+                brightness: 40%
+                transition_length: 0s
+            - globals.set:
+                id: color_initialized
+                value: "true"
+          else:
+            # Subsequent boots: restore cached color, but always come on at 40%
+            - light.turn_on:
+                id: light_main
+                brightness: 40%
+                transition_length: 0s
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -167,7 +192,7 @@ light:
               slow_timer = 0;
               float r = (float)(rand() % 1000) / 1000.0f;
               r = r * r * r;  // cubic: mostly near 1.0, rare dramatic dips
-              slow_target = 1.0f - r * (wind * 0.20f);
+              slow_target = 1.0f - r * (wind * 0.35f);
             }
             // Asymmetric smoothing: slow to dim, fast to recover
             float alpha = (slow_b > slow_target) ? (0.08f + wind * 0.12f) : 0.30f;
@@ -175,7 +200,7 @@ light:
 
             // ── Fast jitter layer: small turbulence every tick ──
             float fast_noise = (float)(rand() % 1000) / 1000.0f;
-            float fast_target = 1.0f - fast_noise * (wind * 0.03f);
+            float fast_target = 1.0f - fast_noise * (wind * 0.06f);
             fast_b = fast_b * 0.65f + fast_target * 0.35f;
 
             float bri_mult = slow_b * fast_b;
@@ -242,18 +267,18 @@ light:
             // ── Wavelength-based hue + saturation shift ──
             // Dim → lower hue (longer wavelength): yellow→orange, blue→teal, purple→blue
             // Dim → higher saturation: colors deepen as the flame cools
-            float global_hue_shift = -(1.0f - bri_mult) * wind * 0.05f;
-            float global_sat_boost = (1.0f - bri_mult) * wind * 0.10f;
+            float global_hue_shift = -(1.0f - bri_mult) * wind * 0.10f;
+            float global_sat_boost = (1.0f - bri_mult) * wind * 0.20f;
 
             // ── Per-LED output: apply lean + hue/sat shift, convert to RGB, gamma, set outputs ──
             // Hot LED (lean=1.0): no extra shift. Cool LED (lean<1.0): extra redward + more saturated.
             // gamma = 2.0 → output = val * val; directly drives all 12 channels.
             {
               float lean = lean_d2;
-              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.025f;
+              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.05f;
               if (led_hue < 0.0f) led_hue = 0.0f;
               if (led_hue > 1.0f) led_hue = 1.0f;
-              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.05f;
+              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.10f;
               if (sat_led > 1.0f) sat_led = 1.0f;
               float h6 = led_hue * 6.0f; int hi = (int)h6; float f = h6 - (float)hi;
               float p = val_h*(1.0f-sat_led), q = val_h*(1.0f-sat_led*f), t = val_h*(1.0f-sat_led*(1.0f-f));
@@ -276,10 +301,10 @@ light:
             }
             {
               float lean = lean_d3;
-              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.025f;
+              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.05f;
               if (led_hue < 0.0f) led_hue = 0.0f;
               if (led_hue > 1.0f) led_hue = 1.0f;
-              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.05f;
+              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.10f;
               if (sat_led > 1.0f) sat_led = 1.0f;
               float h6 = led_hue * 6.0f; int hi = (int)h6; float f = h6 - (float)hi;
               float p = val_h*(1.0f-sat_led), q = val_h*(1.0f-sat_led*f), t = val_h*(1.0f-sat_led*(1.0f-f));
@@ -302,10 +327,10 @@ light:
             }
             {
               float lean = lean_d4;
-              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.025f;
+              float led_hue = hue + global_hue_shift + (lean - 1.0f) * wind * 0.05f;
               if (led_hue < 0.0f) led_hue = 0.0f;
               if (led_hue > 1.0f) led_hue = 1.0f;
-              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.05f;
+              float sat_led = sat + global_sat_boost + (1.0f - lean) * wind * 0.10f;
               if (sat_led > 1.0f) sat_led = 1.0f;
               float h6 = led_hue * 6.0f; int hi = (int)h6; float f = h6 - (float)hi;
               float p = val_h*(1.0f-sat_led), q = val_h*(1.0f-sat_led*f), t = val_h*(1.0f-sat_led*(1.0f-f));
@@ -413,6 +438,10 @@ globals:
   - id: flicker_running
     type: bool
     restore_value: no
+    initial_value: "false"
+  - id: color_initialized
+    type: bool
+    restore_value: yes
     initial_value: "false"
 
 number:
