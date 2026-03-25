@@ -5,9 +5,9 @@ Copyright (C) 2026 Brian Alvarez. Licensed under the [GNU General Public License
 ESPHome firmware for the beautiful Velaflame candles:
 https://www.velaflame.com/
 
-If you are looking for attractive, dynamic LED candles, I highly recommend these! Disclosure that I recieved a partial discount code after emailing them and describing my desire to cut the candles up and convert them to run on battery power (more details to come). I do not have any other financial connection to Velaflame, they just make the best LED candle hardware on the market today!
-
 The existing Velaflame firmware and app did not work with my specific needs (native Home Assistant support) so I wrote my own firmware based on ESPHome.
+
+If you are looking for attractive, dynamic LED candles, I highly recommend these! Disclosure that I recieved a partial discount code after emailing them and describing my desire to cut the candles up and convert them to run on battery power (more details to come). I do not have any other financial connection to Velaflame, they just make the best LED candle hardware on the market today!
 
 ## Installing new firmware
 To flash the new firmware, follow these [Instructions](FLASH_FIRMWARE.md)
