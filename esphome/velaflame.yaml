@@ -1,0 +1,388 @@
+substitutions:
+  device_name: velaflame
+  friendly_name: VelaFlame
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/<user>/velaflame
+      ref: main
+    components: [tlc59116]
+
+esphome:
+  on_boot:
+    priority: 900
+    then:
+      - output.turn_on: tlc59116_enable_pin
+      - delay: 5ms
+      - logger.log: "${friendly_name} booted — TLC59116 enable pin set"
+
+i2c:
+  sda: GPIO01
+  scl: GPIO04
+  scan: True
+  frequency: 100kHz
+
+tlc59116:
+  address: 0x60
+
+output:
+  # TLC59116 enable pin - driven HIGH on boot before TLC59116 init
+  - platform: gpio
+    pin: GPIO10
+    id: tlc59116_enable_pin
+  # DRV8210P H-bridge for wick electromagnet
+  # https://www.ti.com/lit/ds/symlink/drv8210p.pdf
+  - platform: gpio
+    pin: GPIO19
+    id: hbridge_nsleep
+  - platform: ledc
+    pin: GPIO03
+    id: hbridge_in1
+    frequency: 25000Hz
+  - platform: ledc
+    pin: GPIO00
+    id: hbridge_in2
+    frequency: 25000Hz
+  # D2: RGBW
+  - platform: tlc59116
+    channel: 0
+    id: d2_r
+  - platform: tlc59116
+    channel: 1
+    id: d2_g
+  - platform: tlc59116
+    channel: 2
+    id: d2_b
+  - platform: tlc59116
+    channel: 3
+    id: d2_w
+  # D3: RGBW
+  - platform: tlc59116
+    channel: 5
+    id: d3_r
+  - platform: tlc59116
+    channel: 6
+    id: d3_g
+  - platform: tlc59116
+    channel: 8
+    id: d3_b
+  - platform: tlc59116
+    channel: 9
+    id: d3_w
+  # D4: RGBW
+  - platform: tlc59116
+    channel: 12
+    id: d4_r
+  - platform: tlc59116
+    channel: 13
+    id: d4_g
+  - platform: tlc59116
+    channel: 14
+    id: d4_b
+  - platform: tlc59116
+    channel: 15
+    id: d4_w
+  # Combined outputs - fan out to all 3 LEDs
+  - platform: template
+    id: all_r
+    type: float
+    write_action:
+      - output.set_level:
+          id: d2_r
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d3_r
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d4_r
+          level: !lambda "return state;"
+  - platform: template
+    id: all_g
+    type: float
+    write_action:
+      - output.set_level:
+          id: d2_g
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d3_g
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d4_g
+          level: !lambda "return state;"
+  - platform: template
+    id: all_b
+    type: float
+    write_action:
+      - output.set_level:
+          id: d2_b
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d3_b
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d4_b
+          level: !lambda "return state;"
+  - platform: template
+    id: all_w
+    type: float
+    write_action:
+      - output.set_level:
+          id: d2_w
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d3_w
+          level: !lambda "return state;"
+      - output.set_level:
+          id: d4_w
+          level: !lambda "return state;"
+
+light:
+  # Main combined light
+  - platform: rgbw
+    name: "${friendly_name}"
+    id: light_main
+    red: all_r
+    green: all_g
+    blue: all_b
+    white: all_w
+    gamma_correct: 2.0
+    effects:
+      - lambda:
+          name: "Candle Flicker"
+          update_interval: 50ms
+          lambda: |-
+            static float smooth = 1.0f;
+            float wind = id(candle_intensity).state;
+            float flicker = (float)(rand() % 1000) / 1000.0f;
+            float min_b = 1.0f - wind * 0.7f;
+            float target = min_b + flicker * (1.0f - min_b);
+            float alpha = 0.15f + wind * 0.35f;
+            smooth = smooth * (1.0f - alpha) + target * alpha;
+            auto call = id(light_main).turn_on();
+            call.set_brightness(id(light_main).remote_values.get_brightness() * smooth);
+            call.set_transition_length(0);
+            call.set_publish(false);
+            call.set_save(false);
+            call.perform();
+  # Individual LEDs (hidden by default, for advanced per-LED control)
+  - platform: rgbw
+    name: "${friendly_name} D2"
+    id: light_d2
+    red: d2_r
+    green: d2_g
+    blue: d2_b
+    white: d2_w
+    disabled_by_default: True
+    gamma_correct: 2.0
+    effects:
+      - lambda:
+          name: "Candle Flicker"
+          update_interval: 50ms
+          lambda: |-
+            static float smooth = 1.0f;
+            float wind = id(candle_intensity).state;
+            float flicker = (float)(rand() % 1000) / 1000.0f;
+            float min_b = 1.0f - wind * 0.7f;
+            float target = min_b + flicker * (1.0f - min_b);
+            float alpha = 0.15f + wind * 0.35f;
+            smooth = smooth * (1.0f - alpha) + target * alpha;
+            auto call = id(light_d2).turn_on();
+            call.set_brightness(id(light_d2).remote_values.get_brightness() * smooth);
+            call.set_transition_length(0);
+            call.set_publish(false);
+            call.set_save(false);
+            call.perform();
+  - platform: rgbw
+    name: "${friendly_name} D3"
+    id: light_d3
+    red: d3_r
+    green: d3_g
+    blue: d3_b
+    white: d3_w
+    disabled_by_default: True
+    gamma_correct: 2.0
+    effects:
+      - lambda:
+          name: "Candle Flicker"
+          update_interval: 50ms
+          lambda: |-
+            static float smooth = 1.0f;
+            float wind = id(candle_intensity).state;
+            float flicker = (float)(rand() % 1000) / 1000.0f;
+            float min_b = 1.0f - wind * 0.7f;
+            float target = min_b + flicker * (1.0f - min_b);
+            float alpha = 0.15f + wind * 0.35f;
+            smooth = smooth * (1.0f - alpha) + target * alpha;
+            auto call = id(light_d3).turn_on();
+            call.set_brightness(id(light_d3).remote_values.get_brightness() * smooth);
+            call.set_transition_length(0);
+            call.set_publish(false);
+            call.set_save(false);
+            call.perform();
+  - platform: rgbw
+    name: "${friendly_name} D4"
+    id: light_d4
+    red: d4_r
+    green: d4_g
+    blue: d4_b
+    white: d4_w
+    disabled_by_default: True
+    gamma_correct: 2.0
+    effects:
+      - lambda:
+          name: "Candle Flicker"
+          update_interval: 50ms
+          lambda: |-
+            static float smooth = 1.0f;
+            float wind = id(candle_intensity).state;
+            float flicker = (float)(rand() % 1000) / 1000.0f;
+            float min_b = 1.0f - wind * 0.7f;
+            float target = min_b + flicker * (1.0f - min_b);
+            float alpha = 0.15f + wind * 0.35f;
+            smooth = smooth * (1.0f - alpha) + target * alpha;
+            auto call = id(light_d4).turn_on();
+            call.set_brightness(id(light_d4).remote_values.get_brightness() * smooth);
+            call.set_transition_length(0);
+            call.set_publish(false);
+            call.set_save(false);
+            call.perform();
+
+globals:
+  - id: flicker_running
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+number:
+  - platform: template
+    name: "Candle Flicker Intensity"
+    id: candle_intensity
+    min_value: 0.4
+    max_value: 1.0
+    step: 0.05
+    initial_value: 0.5
+    optimistic: True
+    restore_value: True
+    icon: "mdi:weather-windy"
+  - platform: template
+    name: "Wick Pulse Duration"
+    id: pulse_duration
+    min_value: 10
+    max_value: 500
+    step: 10
+    initial_value: 200
+    unit_of_measurement: ms
+    optimistic: True
+    restore_value: True
+  - platform: template
+    name: "Wick Flicker Intensity"
+    id: flicker_intensity
+    min_value: 0.1
+    max_value: 1.0
+    step: 0.05
+    initial_value: 0.5
+    optimistic: True
+    restore_value: True
+  - platform: template
+    name: "Wick Flicker Min Interval"
+    id: flicker_min_interval
+    min_value: 10
+    max_value: 500
+    step: 10
+    initial_value: 100
+    unit_of_measurement: ms
+    optimistic: True
+    restore_value: True
+  - platform: template
+    name: "Wick Flicker Max Interval"
+    id: flicker_max_interval
+    min_value: 10
+    max_value: 1000
+    step: 10
+    initial_value: 500
+    unit_of_measurement: ms
+    optimistic: True
+    restore_value: True
+
+button:
+  - platform: template
+    name: "Wick Pulse"
+    on_press:
+      - script.execute: pulse_wick
+
+switch:
+  - platform: template
+    name: "Wick Flicker"
+    id: flicker_switch
+    optimistic: True
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - globals.set:
+          id: flicker_running
+          value: "true"
+      - output.turn_on: hbridge_nsleep
+      - script.execute: flicker_loop
+    turn_off_action:
+      - globals.set:
+          id: flicker_running
+          value: "false"
+      - script.stop: flicker_loop
+      - output.set_level:
+          id: hbridge_in1
+          level: 0
+      - output.set_level:
+          id: hbridge_in2
+          level: 0
+      - output.turn_off: hbridge_nsleep
+
+script:
+  - id: pulse_wick
+    mode: single
+    then:
+      - output.turn_on: hbridge_nsleep
+      - output.set_level:
+          id: hbridge_in2
+          level: 0
+      - output.set_level:
+          id: hbridge_in1
+          level: !lambda "return id(flicker_intensity).state;"
+      - delay: !lambda "return (int)id(pulse_duration).state;"
+      - output.set_level:
+          id: hbridge_in1
+          level: 0
+      - output.set_level:
+          id: hbridge_in2
+          level: 0
+      # Sleep the driver if flicker isn't running
+      - if:
+          condition:
+            lambda: "return !id(flicker_running);"
+          then:
+            - output.turn_off: hbridge_nsleep
+
+  - id: flicker_loop
+    mode: single
+    then:
+      - while:
+          condition:
+            lambda: "return id(flicker_running);"
+          then:
+            - script.execute: pulse_wick
+            - script.wait: pulse_wick
+            - delay: !lambda |-
+                int min_ms = (int)id(flicker_min_interval).state;
+                int max_ms = (int)id(flicker_max_interval).state;
+                if (max_ms <= min_ms) max_ms = min_ms + 100;
+                return min_ms + random(max_ms - min_ms);
+
+# LED Driver info:
+# https://www.ti.com/lit/ds/symlink/tlc59116.pdf
+# addresses: 0x60, 0x68, 0x6b
+# 0x6b is probably startup master addr.
+
+# Channels:
+# D2: R: 0, G: 1, B: 2, W: 3
+# D3: R: 5, G: 6, B: 8, W: 9
+# D4: R: 12, G: 13, B: 14, W: 15
+# Not used: 4, 7, 10, 11
