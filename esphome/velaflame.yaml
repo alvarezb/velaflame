@@ -10,12 +10,19 @@ external_components:
     components: [tlc59116]
 
 esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
   on_boot:
     priority: 900
     then:
       - output.turn_on: tlc59116_enable_pin
       - delay: 5ms
       - logger.log: "${friendly_name} booted — TLC59116 enable pin set"
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
 
 i2c:
   sda: GPIO01

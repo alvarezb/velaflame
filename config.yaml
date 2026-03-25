@@ -16,15 +16,6 @@ packages:
     files:
       - esphome/velaflame.yaml
 
-esphome:
-  name: ${device_name}
-  friendly_name: ${friendly_name}
-
-esp32:
-  board: esp32-c3-devkitm-1
-  framework:
-    type: arduino
-
 logger:
 
 api:
