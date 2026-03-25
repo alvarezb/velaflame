@@ -5,7 +5,7 @@ substitutions:
 external_components:
   - source:
       type: git
-      url: https://github.com/<user>/velaflame
+      url: https://github.com/alvarezb/velaflame
       ref: main
     components: [tlc59116]
 

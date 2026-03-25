@@ -1,6 +1,9 @@
 substitutions:
-  device_name: velaflame
-  friendly_name: VelaFlame
+  device_name: velaflame06
+  friendly_name: VelaFlame06
+  api_encryption_key: "api_key_here"
+  ota_password: "ota_password_here"
+  wifi_ap_password: "wifi_ap_password_here"
 
 packages:
   velaflame:
@@ -22,17 +25,17 @@ logger:
 
 api:
   encryption:
-    key: "InsertYourEncryptionKeyHere"
+    key: ${api_encryption_key}
 
 ota:
   - platform: esphome
-    password: "InsertYourOTAPasswordHere"
+    password: ${ota_password}
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
     ssid: "${friendly_name} Fallback Hotspot"
-    password: "InsertYourAPPasswordHere"
+    password: ${wifi_ap_password}
 
 captive_portal:
