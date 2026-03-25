@@ -167,7 +167,7 @@ light:
               slow_timer = 0;
               float r = (float)(rand() % 1000) / 1000.0f;
               r = r * r * r;  // cubic: mostly near 1.0, rare dramatic dips
-              slow_target = 1.0f - r * (wind * 0.6f);
+              slow_target = 1.0f - r * (wind * 0.35f);
             }
             // Asymmetric smoothing: slow to dim, fast to recover
             float alpha = (slow_b > slow_target) ? (0.08f + wind * 0.12f) : 0.30f;
@@ -175,17 +175,18 @@ light:
 
             // ── Fast jitter layer: small turbulence every tick ──
             float fast_noise = (float)(rand() % 1000) / 1000.0f;
-            float fast_target = 1.0f - fast_noise * (wind * 0.10f);
+            float fast_target = 1.0f - fast_noise * (wind * 0.06f);
             fast_b = fast_b * 0.65f + fast_target * 0.35f;
 
             float bri_mult = slow_b * fast_b;
-            if (bri_mult < 0.05f) bri_mult = 0.05f;
+            if (bri_mult < 0.15f) bri_mult = 0.15f;
             if (bri_mult > 1.0f)  bri_mult = 1.0f;
 
             // ── Flame lean: random-walk angle around the wick triangle ──
             // D2/D3/D4 are 120° apart; projecting onto them guarantees one is always
             // brighter and one always dimmer — no more three-way ties
-            lean_angle += ((float)(rand() % 1000) / 500.0f - 1.0f) * wind * 5.0f;
+            // Advance ~2.5°/tick = full rotation in ~144 ticks = ~7s; jitter for organic feel
+            lean_angle += 2.5f + ((float)(rand() % 1000) / 500.0f - 1.0f) * 1.5f;
             if (lean_angle >= 360.0f) lean_angle -= 360.0f;
             if (lean_angle <    0.0f) lean_angle += 360.0f;
 
