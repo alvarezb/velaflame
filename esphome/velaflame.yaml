@@ -8,6 +8,7 @@ external_components:
       url: https://github.com/alvarezb/velaflame
       ref: main
     components: [tlc59116]
+    refresh: always
 
 esphome:
   name: ${device_name}
