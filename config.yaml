@@ -1,13 +1,14 @@
 substitutions:
-  device_name: velaflame
-  friendly_name: VelaFlame
+  device_number: "99"
+  device_name: velaflame${device_number}
+  friendly_name: "VelaFlame ${device_number}"
 
   # Replace with real keys!! This is just a random key so it will compile.
   # If you add a "new" device in the ESPHome Builder, it will generate
   # and cache new encryption keys for you, copy those into these fields.
-  api_encryption_key: "cPlJ498NVOuOHA3uIQM5FoR2NLqzQvlLaa9CKUq8hkY="
-  ota_password: "ota_password_here"
-  wifi_ap_password: "wifi_ap_password_here"
+  api_encryption_key: "FAKE="
+  ota_password: "FAKE"
+  wifi_ap_password: "FAKE"
 
 packages:
   velaflame:
