@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Brian Alvarez
+
 #pragma once
 
 #include "esphome/core/component.h"

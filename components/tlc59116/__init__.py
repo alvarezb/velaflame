@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Brian Alvarez
+
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
