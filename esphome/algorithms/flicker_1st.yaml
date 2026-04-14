@@ -15,10 +15,10 @@
 #   4. HSV color shift   — cooler/dimmer LEDs shift hue toward longer wavelengths and
 #                          gain saturation (Bezold-Brücke / Abney effects)
 
-- lambda:
-    name: "1st flicker"
-    update_interval: 50ms
-    lambda: |-
+lambda:
+  name: "1st flicker"
+  update_interval: 50ms
+  lambda: |-
       // ── Static state: base flicker ──
       static float slow_b      = 1.0f;
       static float fast_b      = 1.0f;

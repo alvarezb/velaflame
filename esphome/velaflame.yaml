@@ -174,7 +174,9 @@ light:
     blue: all_b
     white: all_w
     gamma_correct: 2.0
-    effects: !include_dir_merge_list algorithms/
+    effects:
+      - !include algorithms/flicker_1st.yaml
+      - !include algorithms/carangil_flicker.yaml
   # Individual LEDs (hidden by default, for advanced per-LED control)
   - platform: rgbw
     name: "${friendly_name} D2"
