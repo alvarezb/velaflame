@@ -19,6 +19,7 @@ packages:
     ref: main
     files:
       - esphome/velaflame.yaml
+    refresh: always
 
 logger:
 
