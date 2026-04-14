@@ -1,0 +1,181 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Brian Alvarez
+#
+# Candle Flicker effect — carangil spring-damper model.
+# Ref: github.com/carangil/candle (Mark Sherman)
+#      github.com/wagiminator/ATtiny85-TinyCandle (byte-for-byte copy of same core)
+#
+# Inputs (from velaflame.yaml):
+#   id(candle_intensity)  - 0.4–1.0 wind/turbulence strength
+#   id(light_main)        - the combined RGBW light (remote_values = user color/brightness)
+#   id(d2_r/g/b/w) … id(d4_r/g/b/w) - per-LED hardware outputs
+#
+# Algorithm overview:
+#   1. Spring-damper physics  — 2D flame position (fx, fy) with velocity, driven by an
+#                               underdamped spring (k=1, damping 0.999 every 4th frame).
+#                               Perturbations scaled by uncalm, which triangle-waves
+#                               between calm and windy states, with 0.25%/frame "bonus gust".
+#   2. Triangle LED mapping   — equilateral triangle vertex dot-products replace the
+#                               original 4-corner (128±x±y) formula.
+#   3. RGBW color temperature — brightness drives RGB ratio (amber at dim, warm-white
+#                               at bright); W is a scaled baseline warm glow.
+#
+# NOT YET IMPLEMENTED — slow drift layer:
+#   cpldcpu's photodiode measurements of real candles (cpldcpu.com/2016/01/05/…) show
+#   slow baseline brightness drift over tens of seconds in undisturbed flames, separate
+#   from fast flicker. To add this layer, uncomment the drift block below and multiply
+#   drift into bri_mult. A 1D Perlin noise would be more organic than a sine wave.
+#
+#   static float drift_phase = 0.0f;
+#   // ── Slow drift layer: sine wave, ~63s period at 20ms/frame ──
+#   drift_phase += 0.002f;
+#   if (drift_phase > 6.2832f) drift_phase -= 6.2832f;
+#   float drift = 1.0f + sinf(drift_phase) * 0.12f;  // ±12% baseline
+#   // Multiply into bri_mult: bri_mult *= drift; (add static float drift_phase above)
+
+lambda:
+  name: "carangil flicker"
+  update_interval: 20ms
+  lambda: |-
+      // ── Static state: spring-damper ──
+      static float fx = 0.0f, fy = 0.0f;   // flame position (centred at 0)
+      static float vx = 0.0f, vy = 0.0f;   // velocity
+      static float uncalm     = 10.0f;      // agitation level (triangle-waves)
+      static int   uncalm_dir = 1;
+      static int   frame_count = 0;
+
+      float wind = id(candle_intensity).state;  // 0.4–1.0
+
+      frame_count++;
+
+      // ── Uncalm triangle wave ──
+      // At wind=1.0 this matches carangil's original integer range of 1–60.
+      // At wind=0.4 the range compresses to 1–25, giving a calmer baseline.
+      float uncalm_max = 1.0f + wind * 59.0f;
+      uncalm += (float)uncalm_dir * 0.5f;
+      if (uncalm >= uncalm_max) uncalm_dir = -1;
+      if (uncalm <= 0.5f)       uncalm_dir =  1;
+
+      // Bonus gust: 0.25% chance per frame doubles the agitation
+      float effective_uncalm = uncalm;
+      if ((esp_random() % 400) == 0) effective_uncalm *= 2.0f;
+
+      // ── Random perturbation ──
+      // Scale matches carangil's integer domain (÷128 to normalise to ±1 position range).
+      float rx = ((float)(int)(esp_random() % 2001) - 1000.0f) / 1000.0f;  // -1 to 1
+      float ry = ((float)(int)(esp_random() % 2001) - 1000.0f) / 1000.0f;
+      float perturb = effective_uncalm / 128.0f;
+      vx += rx * perturb;
+      vy += ry * perturb;
+
+      // ── Spring restoring force (k=1) ──
+      vx -= fx;
+      vy -= fy;
+
+      // ── Damping every 4th frame (very slight — system is underdamped) ──
+      if ((frame_count % 4) == 0) {
+        vx *= 0.999f;
+        vy *= 0.999f;
+      }
+
+      // ── Integrate position ──
+      fx += vx;
+      fy += vy;
+
+      // Soft safety clamp — spring alone prevents runaway but guards against startup spikes
+      float flen = sqrtf(fx * fx + fy * fy);
+      if (flen > 2.0f) {
+        float inv = 2.0f / flen;
+        fx *= inv; fy *= inv;
+        vx *= 0.5f; vy *= 0.5f;
+      }
+
+      // ── Global brightness multiplier from flame displacement ──
+      float pos_mag = sqrtf(fx * fx + fy * fy);
+      float bri_mult = 1.0f - pos_mag * wind * 0.25f;
+      if (bri_mult < 0.15f) bri_mult = 0.15f;
+      if (bri_mult > 1.0f)  bri_mult = 1.0f;
+
+      // ── 3-LED triangle mapping via dot products ──
+      // D2/D3/D4 placed at vertices of equilateral triangle, 120° apart.
+      //   D2: top          (  0.0,   1.0 )
+      //   D3: bottom-left  ( -0.866, -0.5 )
+      //   D4: bottom-right ( +0.866, -0.5 )
+      // dot(flame_pos, vertex) → how strongly the flame "faces" each LED.
+      // lum = 0.5 + dot * lean_scale  → LED range [0.05, 1.0]
+      const float lean_scale = 0.4f;  // amplitude of per-LED brightness variation
+      float lum2 = 0.5f + (fx * 0.0f    + fy * 1.0f  ) * lean_scale;
+      float lum3 = 0.5f + (fx * -0.866f + fy * -0.5f ) * lean_scale;
+      float lum4 = 0.5f + (fx * 0.866f  + fy * -0.5f ) * lean_scale;
+      if (lum2 < 0.05f) lum2 = 0.05f; if (lum2 > 1.0f) lum2 = 1.0f;
+      if (lum3 < 0.05f) lum3 = 0.05f; if (lum3 > 1.0f) lum3 = 1.0f;
+      if (lum4 < 0.05f) lum4 = 0.05f; if (lum4 > 1.0f) lum4 = 1.0f;
+
+      // ── Skip output writes during color/brightness transitions ──
+      // ESPHome's transition system writes uniform color to all_r/g/b/w (fan-out).
+      // Our per-LED writes only happen every 20ms; between writes the transition
+      // overwrites our values — causing strobing.
+      // Fix: detect an active transition and yield to it; internal state keeps advancing.
+      {
+        float tr = fabsf(id(light_main).current_values.get_brightness() - id(light_main).remote_values.get_brightness())
+                 + fabsf(id(light_main).current_values.get_red()        - id(light_main).remote_values.get_red())
+                 + fabsf(id(light_main).current_values.get_green()      - id(light_main).remote_values.get_green())
+                 + fabsf(id(light_main).current_values.get_blue()       - id(light_main).remote_values.get_blue())
+                 + fabsf(id(light_main).current_values.get_white()      - id(light_main).remote_values.get_white());
+        if (tr > 0.02f) return;
+      }
+
+      // ── Read user base color (remote_values stable because publish=false) ──
+      float rem_bri = id(light_main).remote_values.get_brightness();
+      float rem_col = id(light_main).remote_values.get_color_brightness();
+      float rem_r   = id(light_main).remote_values.get_red();
+      float rem_g   = id(light_main).remote_values.get_green();
+      float rem_bv  = id(light_main).remote_values.get_blue();
+      float rem_w   = id(light_main).remote_values.get_white();
+
+      // ── Per-LED output: RGBW color temperature curve ──
+      // The carangil model drives color directly from per-LED brightness (ct).
+      // User color (rem_r/g/bv) acts as a tint multiplier — warm amber reinforces
+      // the effect; cool white desaturates it slightly.
+      //
+      // Color temperature mapping (ct = per-LED brightness scalar, 0→1):
+      //   R: always dominant (1.0)
+      //   G: 0.25 at dim (amber) → 0.75 at bright (warm white)
+      //   B: 0.0  at dim (amber) → 0.15 at bright (slightly cooler)
+      //   W: baseline warm glow, scaled by lum × bri_mult
+      //
+      // gamma = 2.0 → output = val * val; applied manually (bypasses ESPHome gamma).
+
+      {
+        float lum = lum2;
+        float ct = lum * bri_mult;
+        float scale  = rem_bri * ct * rem_col; if (scale  > 1.0f) scale  = 1.0f;
+        float wscale = rem_bri * lum * bri_mult * rem_w; if (wscale > 1.0f) wscale = 1.0f;
+        float v;
+        v = scale * 1.0f                * rem_r;  id(d2_r).set_level(v * v);
+        v = scale * (0.25f + ct * 0.50f)* rem_g;  id(d2_g).set_level(v * v);
+        v = scale * (ct * 0.15f)        * rem_bv; id(d2_b).set_level(v * v);
+        v = wscale;                                id(d2_w).set_level(v * v);
+      }
+      {
+        float lum = lum3;
+        float ct = lum * bri_mult;
+        float scale  = rem_bri * ct * rem_col; if (scale  > 1.0f) scale  = 1.0f;
+        float wscale = rem_bri * lum * bri_mult * rem_w; if (wscale > 1.0f) wscale = 1.0f;
+        float v;
+        v = scale * 1.0f                * rem_r;  id(d3_r).set_level(v * v);
+        v = scale * (0.25f + ct * 0.50f)* rem_g;  id(d3_g).set_level(v * v);
+        v = scale * (ct * 0.15f)        * rem_bv; id(d3_b).set_level(v * v);
+        v = wscale;                                id(d3_w).set_level(v * v);
+      }
+      {
+        float lum = lum4;
+        float ct = lum * bri_mult;
+        float scale  = rem_bri * ct * rem_col; if (scale  > 1.0f) scale  = 1.0f;
+        float wscale = rem_bri * lum * bri_mult * rem_w; if (wscale > 1.0f) wscale = 1.0f;
+        float v;
+        v = scale * 1.0f                * rem_r;  id(d4_r).set_level(v * v);
+        v = scale * (0.25f + ct * 0.50f)* rem_g;  id(d4_g).set_level(v * v);
+        v = scale * (ct * 0.15f)        * rem_bv; id(d4_b).set_level(v * v);
+        v = wscale;                                id(d4_w).set_level(v * v);
+      }
