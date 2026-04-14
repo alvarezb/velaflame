@@ -17,8 +17,8 @@
 #                               between calm and windy states, with 0.25%/frame "bonus gust".
 #   2. Triangle LED mapping   — equilateral triangle vertex dot-products replace the
 #                               original 4-corner (128±x±y) formula.
-#   3. RGBW color temperature — brightness drives RGB ratio (amber at dim, warm-white
-#                               at bright); W is a scaled baseline warm glow.
+#   3. RGBW output — flicker (bri_mult) and per-LED lean (lum) modulate the user's
+#                    RGBW color uniformly; no candle CT curve is applied.
 #
 # NOT YET IMPLEMENTED — slow drift layer:
 #   cpldcpu's photodiode measurements of real candles (cpldcpu.com/2016/01/05/…) show
@@ -131,49 +131,39 @@ lambda:
       float rem_bv  = id(light_main).remote_values.get_blue();
       float rem_w   = id(light_main).remote_values.get_white();
 
-      // ── Per-LED output: RGBW color temperature curve ──
-      // The carangil model drives color directly from per-LED brightness (ct).
-      // User color (rem_r/g/bv) acts as a tint multiplier — warm amber reinforces
-      // the effect; cool white desaturates it slightly.
-      //
-      // Color temperature mapping (ct = per-LED brightness scalar, 0→1):
-      //   R: always dominant (1.0)
-      //   G: 0.25 at dim (amber) → 0.75 at bright (warm white)
-      //   B: 0.0  at dim (amber) → 0.15 at bright (slightly cooler)
-      //   W: baseline warm glow, scaled by lum × bri_mult
+      // ── Per-LED output: flicker modulates user RGBW ──
+      // The flicker (bri_mult) and per-LED lean (lum) scale all channels equally,
+      // preserving the color the user set.  No candle CT curve is applied.
       //
       // gamma = 2.0 → output = val * val; applied manually (bypasses ESPHome gamma).
 
       {
-        float lum = lum2;
-        float ct = lum * bri_mult;
+        float ct = lum2 * bri_mult;
         float scale  = rem_bri * ct * rem_col; if (scale  > 1.0f) scale  = 1.0f;
-        float wscale = rem_bri * lum * bri_mult * rem_w; if (wscale > 1.0f) wscale = 1.0f;
+        float wscale = rem_bri * ct * rem_w;   if (wscale > 1.0f) wscale = 1.0f;
         float v;
-        v = scale * 1.0f                * rem_r;  id(d2_r).set_level(v * v);
-        v = scale * (0.25f + ct * 0.50f)* rem_g;  id(d2_g).set_level(v * v);
-        v = scale * (ct * 0.15f)        * rem_bv; id(d2_b).set_level(v * v);
-        v = wscale;                                id(d2_w).set_level(v * v);
+        v = scale * rem_r;  id(d2_r).set_level(v * v);
+        v = scale * rem_g;  id(d2_g).set_level(v * v);
+        v = scale * rem_bv; id(d2_b).set_level(v * v);
+        v = wscale;         id(d2_w).set_level(v * v);
       }
       {
-        float lum = lum3;
-        float ct = lum * bri_mult;
+        float ct = lum3 * bri_mult;
         float scale  = rem_bri * ct * rem_col; if (scale  > 1.0f) scale  = 1.0f;
-        float wscale = rem_bri * lum * bri_mult * rem_w; if (wscale > 1.0f) wscale = 1.0f;
+        float wscale = rem_bri * ct * rem_w;   if (wscale > 1.0f) wscale = 1.0f;
         float v;
-        v = scale * 1.0f                * rem_r;  id(d3_r).set_level(v * v);
-        v = scale * (0.25f + ct * 0.50f)* rem_g;  id(d3_g).set_level(v * v);
-        v = scale * (ct * 0.15f)        * rem_bv; id(d3_b).set_level(v * v);
-        v = wscale;                                id(d3_w).set_level(v * v);
+        v = scale * rem_r;  id(d3_r).set_level(v * v);
+        v = scale * rem_g;  id(d3_g).set_level(v * v);
+        v = scale * rem_bv; id(d3_b).set_level(v * v);
+        v = wscale;         id(d3_w).set_level(v * v);
       }
       {
-        float lum = lum4;
-        float ct = lum * bri_mult;
+        float ct = lum4 * bri_mult;
         float scale  = rem_bri * ct * rem_col; if (scale  > 1.0f) scale  = 1.0f;
-        float wscale = rem_bri * lum * bri_mult * rem_w; if (wscale > 1.0f) wscale = 1.0f;
+        float wscale = rem_bri * ct * rem_w;   if (wscale > 1.0f) wscale = 1.0f;
         float v;
-        v = scale * 1.0f                * rem_r;  id(d4_r).set_level(v * v);
-        v = scale * (0.25f + ct * 0.50f)* rem_g;  id(d4_g).set_level(v * v);
-        v = scale * (ct * 0.15f)        * rem_bv; id(d4_b).set_level(v * v);
-        v = wscale;                                id(d4_w).set_level(v * v);
+        v = scale * rem_r;  id(d4_r).set_level(v * v);
+        v = scale * rem_g;  id(d4_g).set_level(v * v);
+        v = scale * rem_bv; id(d4_b).set_level(v * v);
+        v = wscale;         id(d4_w).set_level(v * v);
       }
