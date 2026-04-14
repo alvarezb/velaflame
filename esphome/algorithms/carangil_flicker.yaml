@@ -51,7 +51,7 @@ lambda:
       // ── Uncalm triangle wave ──
       // At wind=1.0 this matches carangil's original integer range of 1–60.
       // At wind=0.4 the range compresses to 1–25, giving a calmer baseline.
-      float uncalm_max = 1.0f + wind * 59.0f;
+      float uncalm_max = wind * wind * 60.0f;  // quadratic: 9.6 at wind=0.4, 60 at wind=1.0
       uncalm += (float)uncalm_dir * 0.5f;
       if (uncalm >= uncalm_max) uncalm_dir = -1;
       if (uncalm <= 0.5f)       uncalm_dir =  1;
@@ -101,7 +101,7 @@ lambda:
       //   D4: bottom-right ( +0.866, -0.5 )
       // dot(flame_pos, vertex) → how strongly the flame "faces" each LED.
       // lum = 0.5 + dot * lean_scale  → LED range [0.05, 1.0]
-      const float lean_scale = 0.4f;  // amplitude of per-LED brightness variation
+      const float lean_scale = wind * 0.4f;  // scales with intensity: 0.16 at min, 0.4 at max
       float lum2 = 0.5f + (fx * 0.0f    + fy * 1.0f  ) * lean_scale;
       float lum3 = 0.5f + (fx * -0.866f + fy * -0.5f ) * lean_scale;
       float lum4 = 0.5f + (fx * 0.866f  + fy * -0.5f ) * lean_scale;
