@@ -35,7 +35,7 @@
 
 lambda:
   name: "carangil flicker"
-  update_interval: 20ms
+  update_interval: 50ms
   lambda: |-
       // ── Static state: spring-damper ──
       static float fx = 0.0f, fy = 0.0f;   // flame position (centred at 0)
@@ -72,11 +72,9 @@ lambda:
       vx -= fx;
       vy -= fy;
 
-      // ── Damping every 4th frame (very slight — system is underdamped) ──
-      if ((frame_count % 4) == 0) {
-        vx *= 0.999f;
-        vy *= 0.999f;
-      }
+      // ── Damping every frame (increased to tame rapid oscillation at 50ms steps) ──
+      vx *= 0.85f;
+      vy *= 0.85f;
 
       // ── Integrate position ──
       fx += vx;
