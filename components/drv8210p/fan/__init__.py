@@ -40,6 +40,7 @@ CONFIG_SCHEMA = (
     "drv8210p.brake",
     BrakeAction,
     maybe_simple_id({cv.GenerateID(): cv.use_id(DRV8210PFan)}),
+    synchronous=True,
 )
 async def drv8210p_brake_to_code(config, action_id, template_arg, args):
     parent = await cg.get_variable(config[CONF_ID])
