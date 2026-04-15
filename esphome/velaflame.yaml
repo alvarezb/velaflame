@@ -233,10 +233,10 @@ number:
   - platform: template
     name: "Wick Pulse Duration"
     id: pulse_duration
-    min_value: 10
-    max_value: 500
-    step: 10
-    initial_value: 200
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 50
     unit_of_measurement: ms
     optimistic: True
     restore_value: True
@@ -249,26 +249,29 @@ number:
     initial_value: 0.5
     optimistic: True
     restore_value: True
+    disabled_by_default: True
   - platform: template
     name: "Wick Flicker Min Interval"
     id: flicker_min_interval
     min_value: 10
-    max_value: 500
+    max_value: 1000
     step: 10
-    initial_value: 100
+    initial_value: 350
     unit_of_measurement: ms
     optimistic: True
     restore_value: True
+    disabled_by_default: True
   - platform: template
     name: "Wick Flicker Max Interval"
     id: flicker_max_interval
     min_value: 10
-    max_value: 1000
+    max_value: 2000
     step: 10
-    initial_value: 500
+    initial_value: 1000
     unit_of_measurement: ms
     optimistic: True
     restore_value: True
+    disabled_by_default: True
 
 button:
   - platform: template

@@ -61,7 +61,7 @@ class DRV8210PFan : public Component, public fan::Fan {
   fan::FanTraits get_traits() override { return this->traits_; }
 
   fan::FanCall brake() {
-    ESP_LOGD(TAG, "Braking");
+    ESP_LOGV(TAG, "Braking");
     if (this->nsleep_pin_ != nullptr)
       this->nsleep_pin_->digital_write(true);
     this->pin_a_->set_level(1.0f);
@@ -95,19 +95,19 @@ class DRV8210PFan : public Component, public fan::Fan {
       this->pin_b_->set_level(0.0f);
       if (this->nsleep_pin_ != nullptr)
         this->nsleep_pin_->digital_write(false);
-      ESP_LOGD(TAG, "Sleep (coast, power save)");
+      ESP_LOGV(TAG, "Sleep (coast, power save)");
     } else if (this->direction == fan::FanDirection::FORWARD) {
       if (this->nsleep_pin_ != nullptr)
         this->nsleep_pin_->digital_write(true);
       this->pin_a_->set_level(speed);
       this->pin_b_->set_level(0.0f);
-      ESP_LOGD(TAG, "Forward: duty=%.2f", speed);
+      ESP_LOGV(TAG, "Forward: duty=%.2f", speed);
     } else {
       if (this->nsleep_pin_ != nullptr)
         this->nsleep_pin_->digital_write(true);
       this->pin_a_->set_level(0.0f);
       this->pin_b_->set_level(speed);
-      ESP_LOGD(TAG, "Reverse: duty=%.2f", speed);
+      ESP_LOGV(TAG, "Reverse: duty=%.2f", speed);
     }
   }
 
