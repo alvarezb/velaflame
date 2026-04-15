@@ -9,9 +9,9 @@ substitutions:
   # Replace with real keys!! This is just a random key so it will compile.
   # If you add a "new" device in the ESPHome Builder, it will generate
   # and cache new encryption keys for you, copy those into these fields.
-  api_encryption_key: "FAKE="
+  api_encryption_key: "PLEASE+change+me+PLEASE+change+me+PLEASE+c0="
   ota_password: "FAKE"
-  wifi_ap_password: "FAKE"
+  wifi_ap_password: "FAKE_FAKE"
 
 packages:
   velaflame:
