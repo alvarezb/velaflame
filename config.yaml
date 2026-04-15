@@ -16,7 +16,8 @@ substitutions:
 packages:
   velaflame:
     url: https://github.com/alvarezb/velaflame
-    ref: main
+    ref: reorganize
+    refresh: always
     files:
       - esphome/velaflame.yaml
 

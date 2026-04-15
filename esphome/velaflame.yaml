@@ -9,8 +9,8 @@ external_components:
   - source:
       type: git
       url: https://github.com/alvarezb/velaflame
-      ref: main
-    components: [tlc59116]
+      ref: reorganize
+    components: [tlc59116, drv8210p]
     refresh: always
 
 esphome:
@@ -58,11 +58,7 @@ tlc59116:
   enable_pin: GPIO10
 
 output:
-  # DRV8210P H-bridge for wick electromagnet
-  # https://www.ti.com/lit/ds/symlink/drv8210p.pdf
-  - platform: gpio
-    pin: GPIO19
-    id: hbridge_nsleep
+  # DRV8210P LEDC outputs (used by drv8210p fan platform)
   - platform: ledc
     pin: GPIO03
     id: hbridge_in1
@@ -204,6 +200,15 @@ light:
     disabled_by_default: True
     gamma_correct: 2.0
 
+fan:
+  - platform: drv8210p
+    id: wick_motor
+    name: "Wick Motor"
+    pin_a: hbridge_in1
+    pin_b: hbridge_in2
+    nsleep_pin: GPIO19
+    speed_count: 100
+
 globals:
   - id: flicker_running
     type: bool
@@ -281,45 +286,26 @@ switch:
       - globals.set:
           id: flicker_running
           value: "true"
-      - output.turn_on: hbridge_nsleep
       - script.execute: flicker_loop
     turn_off_action:
       - globals.set:
           id: flicker_running
           value: "false"
       - script.stop: flicker_loop
-      - output.set_level:
-          id: hbridge_in1
-          level: 0
-      - output.set_level:
-          id: hbridge_in2
-          level: 0
-      - output.turn_off: hbridge_nsleep
+      - fan.turn_off:
+          id: wick_motor
 
 script:
   - id: pulse_wick
     mode: single
     then:
-      - output.turn_on: hbridge_nsleep
-      - output.set_level:
-          id: hbridge_in2
-          level: 0
-      - output.set_level:
-          id: hbridge_in1
-          level: !lambda "return id(flicker_intensity).state;"
+      - fan.turn_on:
+          id: wick_motor
+          speed: !lambda "return (int)(id(flicker_intensity).state * 100);"
+          direction: forward
       - delay: !lambda "return (int)id(pulse_duration).state;"
-      - output.set_level:
-          id: hbridge_in1
-          level: 0
-      - output.set_level:
-          id: hbridge_in2
-          level: 0
-      # Sleep the driver if flicker isn't running
-      - if:
-          condition:
-            lambda: "return !id(flicker_running);"
-          then:
-            - output.turn_off: hbridge_nsleep
+      - fan.turn_off:
+          id: wick_motor
 
   - id: flicker_loop
     mode: single

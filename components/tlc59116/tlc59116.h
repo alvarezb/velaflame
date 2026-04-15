@@ -73,11 +73,24 @@ class TLC59116Output : public Component, public i2c::I2CDevice {
     ESP_LOGI("tlc59116", "TLC59116 initialized at address 0x%02X", this->address_);
   }
 
+  void dump_config() override {
+    ESP_LOGCONFIG("tlc59116", "TLC59116:");
+    ESP_LOGCONFIG("tlc59116", "  Address: 0x%02X", this->address_);
+    if (this->enable_pin_ != nullptr) {
+      ESP_LOGCONFIG("tlc59116", "  Enable pin: configured");
+    }
+    if (this->is_failed()) {
+      ESP_LOGE("tlc59116", "  Communication failed!");
+    }
+  }
+
   void set_channel_value(uint8_t channel, float state) {
     if (channel > 15)
       return;
     uint8_t pwm = static_cast<uint8_t>(state * 255.0f);
-    this->write_register(REG_PWM0 + channel, &pwm, 1);
+    if (this->write_register(REG_PWM0 + channel, &pwm, 1) != i2c::ERROR_OK) {
+      ESP_LOGW("tlc59116", "Failed to write PWM value to channel %u", channel);
+    }
   }
 
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
