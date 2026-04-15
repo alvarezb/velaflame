@@ -299,13 +299,17 @@ script:
   - id: pulse_wick
     mode: single
     then:
+      # Flick the wick outward
       - fan.turn_on:
           id: wick_motor
           speed: !lambda "return (int)(id(flicker_intensity).state * 100);"
-          direction: forward
+          direction: reverse
       - delay: !lambda "return (int)id(pulse_duration).state;"
-      - fan.turn_off:
+      # Gentle centering force between pulses
+      - fan.turn_on:
           id: wick_motor
+          speed: 25
+          direction: forward
 
   - id: flicker_loop
     mode: single
